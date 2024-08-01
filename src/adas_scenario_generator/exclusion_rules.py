@@ -5,18 +5,24 @@ from tkinter import filedialog, messagebox
 class ExclusionRulesManager:
     def __init__(self):
         self.rules = []
+        self.rule_descriptions = {}  # 新しく追加：ルールの説明を保持する辞書
 
-    def add_rule(self, item1, item2):
+    def add_rule(self, item1, item2, description=""):
         rule = f"{item1} * {item2}"
         if rule not in self.rules:
             self.rules.append(rule)
+            self.rule_descriptions[rule] = description  # 説明を保存
 
     def remove_rule(self, rule):
         if rule in self.rules:
             self.rules.remove(rule)
+            self.rule_descriptions.pop(rule, None)  # 説明も削除
 
     def get_rules(self):
         return self.rules
+
+    def get_rule_description(self, rule):
+        return self.rule_descriptions.get(rule, "")  # ルールの説明を取得
 
     def is_excluded(self, scenario):
         scenario_items = scenario["環境状況"] + scenario["車両状況"]
@@ -33,16 +39,21 @@ class ExclusionRulesManager:
                 with codecs.open(file_path, 'r', 'utf-8-sig') as file:
                     data = json.load(file)
                     if data.get("version") == "1.0":
-                        self.rules = [" * ".join(rule["items"]) for rule in data["rules"]]
+                        self.rules = []
+                        self.rule_descriptions = {}
+                        for rule in data["rules"]:
+                            rule_str = " * ".join(rule["items"])
+                            self.rules.append(rule_str)
+                            self.rule_descriptions[rule_str] = rule["description"]
                         messagebox.showinfo("成功", "除外ルールを読み込みました。")
-                        return True  # 読み込み成功を示す
+                        return True
                     else:
                         messagebox.showerror("エラー", f"サポートされていないファイルバージョンです: {data.get('version')}")
             except json.JSONDecodeError as e:
                 messagebox.showerror("エラー", f"JSONファイルの解析に失敗しました: {str(e)}")
             except Exception as e:
                 messagebox.showerror("エラー", f"ファイルの読み込み中に予期せぬエラーが発生しました: {str(e)}")
-        return False  # 読み込み失敗または中止を示す
+        return False
 
     def save_rules(self):
         file_path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")])
@@ -54,7 +65,7 @@ class ExclusionRulesManager:
                         {
                             "id": i + 1,
                             "items": rule.split(" * "),
-                            "description": f"Rule {i + 1}"
+                            "description": self.rule_descriptions.get(rule, f"Rule {i + 1}")
                         } for i, rule in enumerate(self.rules)
                     ]
                 }

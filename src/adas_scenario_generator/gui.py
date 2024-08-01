@@ -51,11 +51,26 @@ class ADASScenarioGeneratorGUI:
         self.exclusion_entry2 = ttk.Combobox(exclusion_frame, values=self.get_all_items())
         self.exclusion_entry2.pack(pady=5)
 
+        self.exclusion_description = tk.Text(exclusion_frame, height=3, width=50)
+        self.exclusion_description.pack(pady=5)
+
         add_button = ttk.Button(exclusion_frame, text="除外ルール追加", command=self.add_exclusion_rule)
         add_button.pack(pady=5)
 
-        self.exclusion_listbox = tk.Listbox(exclusion_frame, width=50)
-        self.exclusion_listbox.pack(pady=5)
+        # Treeviewを使用して除外ルールと理由を表示
+        self.exclusion_tree = ttk.Treeview(exclusion_frame, columns=('rule', 'reason'), show='headings', height=10)
+        self.exclusion_tree.heading('rule', text='除外ルール')
+        self.exclusion_tree.heading('reason', text='理由')
+        self.exclusion_tree.column('rule', width=200)
+        self.exclusion_tree.column('reason', width=300)
+        self.exclusion_tree.pack(pady=5, fill=tk.BOTH, expand=True)
+
+        # スクロールバーの追加
+        scrollbar = ttk.Scrollbar(exclusion_frame, orient="vertical", command=self.exclusion_tree.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.exclusion_tree.configure(yscrollcommand=scrollbar.set)
+
+        self.exclusion_tree.bind('<<TreeviewSelect>>', self.on_rule_select)
 
         remove_button = ttk.Button(exclusion_frame, text="選択したルールを削除", command=self.remove_exclusion_rule)
         remove_button.pack(pady=5)
@@ -71,25 +86,6 @@ class ADASScenarioGeneratorGUI:
 
         self.update_exclusion_listbox()
 
-    def create_execution_tab(self):
-        execution_frame = ttk.Frame(self.notebook)
-        self.notebook.add(execution_frame, text="実行")
-
-        self.generate_button = ttk.Button(execution_frame, text="シナリオ生成", command=self.generate_scenarios)
-        self.generate_button.pack(pady=20)
-
-        columns = tuple(self.category_manager.categories.keys())
-        self.tree = ttk.Treeview(execution_frame, columns=columns, show="headings")
-        for category in columns:
-            self.tree.heading(category, text=category)
-            self.tree.column(category, width=200)
-        self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        scrollbar = ttk.Scrollbar(execution_frame, orient="vertical", command=self.tree.yview)
-        scrollbar.pack(side="right", fill="y")
-        self.tree.configure(yscrollcommand=scrollbar.set)
-    
-    
     def create_category_management_tab(self):
         management_frame = ttk.Frame(self.notebook)
         self.notebook.add(management_frame, text="カテゴリ管理")
@@ -197,15 +193,29 @@ class ADASScenarioGeneratorGUI:
     def add_exclusion_rule(self):
         item1 = self.exclusion_entry1.get()
         item2 = self.exclusion_entry2.get()
+        description = self.exclusion_description.get("1.0", tk.END).strip()
+        
         if item1 and item2 and item1 != item2:
-            self.exclusion_rules_manager.add_rule(item1, item2)
-            self.update_exclusion_listbox()
+            # 既存のルールと重複していないかチェック
+            existing_rules = self.exclusion_rules_manager.get_rules()
+            rule = f"{item1} * {item2}"
+            reverse_rule = f"{item2} * {item1}"
+            
+            if rule in existing_rules or reverse_rule in existing_rules:
+                messagebox.showwarning("重複", "この組み合わせの除外ルールは既に存在します。")
+            else:
+                self.exclusion_rules_manager.add_rule(item1, item2, description)
+                self.update_exclusion_listbox()
+                self.exclusion_description.delete("1.0", tk.END)  # Clear the description field
+                messagebox.showinfo("追加成功", "新しい除外ルールが追加されました。")
+        else:
+            messagebox.showerror("エラー", "2つの異なる項目を選択してください。")
 
     def remove_exclusion_rule(self):
-        selection = self.exclusion_listbox.curselection()
+        selection = self.exclusion_tree.selection()
         if selection:
-            index = selection[0]
-            rule = self.exclusion_listbox.get(index)
+            item = self.exclusion_tree.item(selection[0])
+            rule = item['values'][0]
             self.exclusion_rules_manager.remove_rule(rule)
             self.update_exclusion_listbox()
 
@@ -214,10 +224,59 @@ class ADASScenarioGeneratorGUI:
             self.update_exclusion_listbox()
 
     def update_exclusion_listbox(self):
-        self.exclusion_listbox.delete(0, tk.END)
+        # Treeviewの内容をクリア
+        for i in self.exclusion_tree.get_children():
+            self.exclusion_tree.delete(i)
+        
+        # 除外ルールと理由を追加
         for rule in self.exclusion_rules_manager.get_rules():
-            self.exclusion_listbox.insert(tk.END, rule)
+            description = self.exclusion_rules_manager.get_rule_description(rule)
+            self.exclusion_tree.insert('', 'end', values=(rule, description))
 
+    def on_rule_select(self, event):
+        selection = self.exclusion_tree.selection()
+        if selection:
+            item = self.exclusion_tree.item(selection[0])
+            rule = item['values'][0]
+            description = item['values'][1]
+            # 選択されたルールの詳細を表示する場合はここに処理を追加
+
+    def remove_category(self):
+        category = self.category_var.get()
+        if not category:
+            messagebox.showerror("エラー", "削除するカテゴリを選択してください")
+            return
+        if messagebox.askyesno("確認", f"カテゴリ '{category}' を削除してもよろしいですか？"):
+            self.category_manager.remove_category(category)
+            self.update_gui()
+
+    def remove_subcategory(self):
+        category = self.category_var.get()
+        subcategory = self.subcategory_var.get()
+        if not category or not subcategory:
+            messagebox.showerror("エラー", "削除するサブカテゴリを選択してください")
+            return
+        if messagebox.askyesno("確認", f"サブカテゴリ '{subcategory}' を削除してもよろしいですか？"):
+            self.category_manager.remove_subcategory(category, subcategory)
+            self.update_gui()
+    def create_execution_tab(self):
+        execution_frame = ttk.Frame(self.notebook)
+        self.notebook.add(execution_frame, text="実行")
+
+        self.generate_button = ttk.Button(execution_frame, text="シナリオ生成", command=self.generate_scenarios)
+        self.generate_button.pack(pady=20)
+
+        columns = tuple(self.category_manager.categories.keys())
+        self.tree = ttk.Treeview(execution_frame, columns=columns, show="headings")
+        for category in columns:
+            self.tree.heading(category, text=category)
+            self.tree.column(category, width=200)
+        self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        scrollbar = ttk.Scrollbar(execution_frame, orient="vertical", command=self.tree.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.tree.configure(yscrollcommand=scrollbar.set)
+    
     def generate_scenarios(self):
         selected = {category: {subcategory: [item for item, var in items.items() if var.get()] 
                             for subcategory, items in subcategories.items() if any(var.get() for var in items.values())}
@@ -248,23 +307,4 @@ class ADASScenarioGeneratorGUI:
                 self.tree.insert("", "end", values=tuple(excluded_values), tags=('excluded',))
 
         self.tree.tag_configure('excluded', foreground='gray')
-        self.tree.insert("", "end", values=(f"合計 {total_scenarios} 件の有効なシナリオが生成されました。", ""))
-    
-    def remove_category(self):
-        category = self.category_var.get()
-        if not category:
-            messagebox.showerror("エラー", "削除するカテゴリを選択してください")
-            return
-        if messagebox.askyesno("確認", f"カテゴリ '{category}' を削除してもよろしいですか？"):
-            self.category_manager.remove_category(category)
-            self.update_gui()
-
-    def remove_subcategory(self):
-        category = self.category_var.get()
-        subcategory = self.subcategory_var.get()
-        if not category or not subcategory:
-            messagebox.showerror("エラー", "削除するサブカテゴリを選択してください")
-            return
-        if messagebox.askyesno("確認", f"サブカテゴリ '{subcategory}' を削除してもよろしいですか？"):
-            self.category_manager.remove_subcategory(category, subcategory)
-            self.update_gui()
+        self.tree.insert("", "end", values=(f"合計 {total_scenarios} 件の有効なシナリオが生成されました。", ""))    
