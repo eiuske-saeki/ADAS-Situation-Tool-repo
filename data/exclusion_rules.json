@@ -1,20 +1,37 @@
 {
-    "version": "1.0",
-    "rules": [
-      {
-        "id": 1,
-        "items": ["高速道路", "交差点"],
-        "description": "高速道路には交差点が存在しないため除外"
-      },
-      {
-        "id": 2,
-        "items": ["停止", "高速"],
-        "description": "停止状態で高速であることはないため除外"
-      },
-      {
-        "id": 3,
-        "items": ["駐車場", "高速"],
-        "description": "駐車場内で高速走行することはないため除外"
-      }
-    ]
-  }
+  "version": "1.0",
+  "rules": [
+    {
+      "id": 1,
+      "items": [
+        "高速道路",
+        "交差点"
+      ],
+      "description": "Rule 1"
+    },
+    {
+      "id": 2,
+      "items": [
+        "停止",
+        "高速"
+      ],
+      "description": "Rule 2"
+    },
+    {
+      "id": 3,
+      "items": [
+        "駐車場",
+        "高速"
+      ],
+      "description": "Rule 3"
+    },
+    {
+      "id": 4,
+      "items": [
+        "駐車場",
+        "交差点"
+      ],
+      "description": "Rule 4"
+    }
+  ]
+}
