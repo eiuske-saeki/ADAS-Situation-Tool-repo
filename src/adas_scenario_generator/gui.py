@@ -266,11 +266,13 @@ class ADASScenarioGeneratorGUI:
         self.generate_button = ttk.Button(execution_frame, text="シナリオ生成", command=self.generate_scenarios)
         self.generate_button.pack(pady=20)
 
-        columns = tuple(self.category_manager.categories.keys())
+        columns = tuple(list(self.category_manager.categories.keys()) + ["除外理由"])
         self.tree = ttk.Treeview(execution_frame, columns=columns, show="headings")
-        for category in columns:
+        for category in self.category_manager.categories.keys():
             self.tree.heading(category, text=category)
             self.tree.column(category, width=200)
+        self.tree.heading("除外理由", text="除外理由")
+        self.tree.column("除外理由", width=300)
         self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         scrollbar = ttk.Scrollbar(execution_frame, orient="vertical", command=self.tree.yview)
@@ -293,18 +295,26 @@ class ADASScenarioGeneratorGUI:
 
         total_scenarios = 0
         for scenario in scenarios:
-            if not self.exclusion_rules_manager.is_excluded(scenario):
+            is_excluded, applied_rules = self.exclusion_rules_manager.is_excluded_with_rules(scenario)
+            if not is_excluded:
                 scenario_values = []
                 for category in self.category_manager.categories.keys():
                     if category in scenario:
                         scenario_values.append(", ".join(scenario[category]))
                     else:
                         scenario_values.append("")
+                scenario_values.append("")  # 除外理由用の空の列
                 self.tree.insert("", "end", values=tuple(scenario_values))
                 total_scenarios += 1
             else:
-                excluded_values = [f"除外: {', '.join(scenario.get(category, []))}" for category in self.category_manager.categories.keys()]
+                excluded_values = []
+                for category in self.category_manager.categories.keys():
+                    if category in scenario:
+                        excluded_values.append(f"{', '.join(scenario[category])}")
+                    else:
+                        excluded_values.append("")
+                excluded_values.append(f"除外理由: {', '.join(applied_rules)}")
                 self.tree.insert("", "end", values=tuple(excluded_values), tags=('excluded',))
 
         self.tree.tag_configure('excluded', foreground='gray')
-        self.tree.insert("", "end", values=(f"合計 {total_scenarios} 件の有効なシナリオが生成されました。", ""))    
+        self.tree.insert("", "end", values=(f"合計 {total_scenarios} 件の有効なシナリオが生成されました。", ""))

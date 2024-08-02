@@ -32,6 +32,15 @@ class ExclusionRulesManager:
                 return True
         return False
 
+    def is_excluded_with_rules(self, scenario):
+        scenario_items = set(scenario.get("環境状況", []) + scenario.get("車両状況", []))
+        applied_rules = []
+        for rule in self.rules:
+            items = set(rule.split(" * "))
+            if items.issubset(scenario_items):
+                applied_rules.append(rule)
+        return len(applied_rules) > 0, applied_rules
+
     def load_rules(self):
         file_path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
         if file_path:
